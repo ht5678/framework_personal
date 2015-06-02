@@ -1,0 +1,6 @@
+
+
+*ResultSetWrapper -- getUnmappedColumnNames
+columnprefix表示在userResultMap里的column全都加上prefix,以跟select语句里column label的匹配
+<association property="user" resultMap="userResultMap" columnPrefix="user_"/>
+
