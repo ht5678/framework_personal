@@ -115,7 +115,12 @@ public class MetaObject {
   public String[] getSetterNames() {
     return objectWrapper.getSetterNames();
   }
-
+  
+  /**
+   * 获取属性name的set方法参数类型
+   * @param name
+   * @return
+   */
   public Class<?> getSetterType(String name) {
     return objectWrapper.getSetterType(name);
   }

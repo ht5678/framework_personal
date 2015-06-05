@@ -85,6 +85,10 @@ class ResultSetWrapper {
     return resultSet;
   }
 
+  /**
+   * resultset结果的所有列名或者是sql as集合
+   * @return
+   */
   public List<String> getColumnNames() {
     return this.columnNames;
   }
@@ -94,43 +98,87 @@ class ResultSetWrapper {
    * Tries to get from the TypeHandlerRegistry by searching for the property type.
    * If not found it gets the column JDBC type and tries to get a handler for it.
    * 
+   * 翻译:当从resultset中取值的之前要获取属性成员的typehandler
+   * 尝试从TypeHandlerRegistry(基本类型)获取,
+   * 如果获取不到就获取类属性成员的columngname(列名)然偶尝试通过jdbctype获取typehandler
+   * 
+   * 
+   * 总结:
+   * 通过类属性成员的propertytype & columnname获取对应的typehandler,方便从resultset中取值
+   * 
+   * 
+   * *通过缓存typeHandlerMap,以propertyType作为key尝试获取对应的typehandler,如果获取到就直接返回,
+   * 
+   * *如果获取不到,通过columnname获取javatype&jdbctype,然后从typeHandlerRegistry尝试获取,获取到就缓存并且返回
+   * 
+   * *如果获取不到或者是未知类型,就定义为ObjectTypeHandler返回,缓存并且返回
+   * 
    * @param propertyType
    * @param columnName
    * @return
    */
   public TypeHandler<?> getTypeHandler(Class<?> propertyType, String columnName) {
     TypeHandler<?> handler = null;
+    //从当前缓存的typeHandlerMap中获取columnname
     Map<Class<?>, TypeHandler<?>> columnHandlers = typeHandlerMap.get(columnName);
+    
     if (columnHandlers == null) {
       columnHandlers = new HashMap<Class<?>, TypeHandler<?>>();
       typeHandlerMap.put(columnName, columnHandlers);
+      
+      //如果map中可以获取列名columnname的缓存,再通过属性类型获取typehandler
     } else {
       handler = columnHandlers.get(propertyType);
     }
+    
+    //如果获取不到缓存typehandler,尝试程序获取
     if (handler == null) {
+      //尝试propertytype(类属性类型)是基本类型
       handler = typeHandlerRegistry.getTypeHandler(propertyType);
       // Replicate logic of UnknownTypeHandler#resolveTypeHandler
       // See issue #59 comment 10
+      //如果handler不是基本类型,或者handler是未知的typehandler类型(可能是用户自定义类)
       if (handler == null || handler instanceof UnknownTypeHandler) {
+    	//通过列名(columnname)获取jdbctype
         final int index = columnNames.indexOf(columnName);
         final JdbcType jdbcType = jdbcTypes.get(index);
+        //classNames.get(index)获取列名对应的java类属性类型的全县定名
+        //通过类型全限定名来获取类型的class类型返回javatype
         final Class<?> javaType = resolveClass(classNames.get(index));
+        //如果javatype & jdbctype都不为空
         if (javaType != null && jdbcType != null) {
+          //根据java类型和jdbc类型获取typehandler
           handler = typeHandlerRegistry.getTypeHandler(javaType, jdbcType);
+          
+          //如果只是javatype不为空
         } else if (javaType != null) {
+        	
+          //只通过javatype获取TypeHandler
           handler = typeHandlerRegistry.getTypeHandler(javaType);
+          
+          //如果只是jdbctype不为空,那么只通过jdbctype来获取typehandler
         } else if (jdbcType != null) {
           handler = typeHandlerRegistry.getTypeHandler(jdbcType);
         }
       }
+      
+      //如果找不到对应的typehandler  或者  handler是未知的,那么定义handler为ObjectTypeHandler
       if (handler == null || handler instanceof UnknownTypeHandler) {
         handler = new ObjectTypeHandler();
       }
+      //将  propertytype(javatype)  --  handler  缓存到typeHandlerMap里边
       columnHandlers.put(propertyType, handler);
     }
+    //返回根据属性类型和列名获取到的typehandler
     return handler;
   }
 
+  
+  /**
+   * 通过类型全限定名来获取类型的class类型返回
+   * @param className		类属性成员的类型全新定名
+   * @return
+   */
   private Class<?> resolveClass(String className) {
     try {
       final Class<?> clazz = Resources.classForName(className);

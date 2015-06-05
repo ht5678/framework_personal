@@ -33,11 +33,24 @@ public class ResultMap {
   
   private Class<?> type;
   private List<ResultMapping> resultMappings;
-  //TODO:返回id类型
+  /*
+   * class Student{
+   *    private int id1;
+   *    private int id2;
+   * 	private String name;
+   *   private String phone;
+   *   private int age;
+   * 	public Student(String name, String phone){
+   * 		this,name = name
+   * 	}
+   * }
+   * 
+   */
+  //id1 , id2就会在idResultMappings里边
   private List<ResultMapping> idResultMappings;
-  //TODO:返回构造函数类型
+  //name  ,  phone就会在constructorResultMappings里边
   private List<ResultMapping> constructorResultMappings;
-  //TODO:返回属性类型
+  //id1,id2,  age就会在propertyResultMappings里边
   private List<ResultMapping> propertyResultMappings;
   private Set<String> mappedColumns;
   private Discriminator discriminator;
@@ -179,6 +192,10 @@ public class ResultMap {
     return resultMappings;
   }
 
+  /**
+   * name  ,  phone就会在constructorResultMappings里边
+   * @return
+   */
   public List<ResultMapping> getConstructorResultMappings() {
     return constructorResultMappings;
   }

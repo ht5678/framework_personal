@@ -86,7 +86,7 @@ public class ClassLoaderWrapper {
 
   /*
    * Find a class on the classpath (or die trying)
-   *
+   *尝试通过一个classloader数组来加载class类
    * @param name - the class to look for
    * @return - the class
    * @throws ClassNotFoundException Duh.
