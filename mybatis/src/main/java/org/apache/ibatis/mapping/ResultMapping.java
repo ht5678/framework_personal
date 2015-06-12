@@ -182,7 +182,7 @@ public class ResultMapping {
         throw new IllegalStateException("Mapping is missing column attribute for property " + resultMapping.property);
       }
       
-      //TODO:
+      //验证在resultmapping的resultset不为空的情况下,resultmapping中的column的数量和foreigncolumn数量是否相等
       if (resultMapping.getResultSet() != null) {
         int numColums = 0;
         if (resultMapping.column != null) {
