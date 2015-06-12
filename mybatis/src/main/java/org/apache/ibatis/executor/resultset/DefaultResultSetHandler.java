@@ -146,14 +146,14 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     final List<Object> multipleResults = new ArrayList<Object>();
 
     int resultSetCount = 0;
-    // 获取stmt的第一个resultset对象并且包装成resultsetwrapper返回,如果没有返回null
+    // 获取stmt的第一个resultset对象并且包装成resultsetwrapper返回,如果没有 返回null
     ResultSetWrapper rsw = getFirstResultSet(stmt);
     //获取mappedstatement里边的resultmap集合
     List<ResultMap> resultMaps = mappedStatement.getResultMaps();
     int resultMapCount = resultMaps.size();
     //校验有返回结果resultset的情况下resultmap集合的数量是否是0
     validateResultMapsCount(rsw, resultMapCount);
-    //如果查询的返回结果不为空 & mappedstatement里边设置的resultmaps熟练 > 查询数据库返回的resultset列数量,一直循环
+    //如果查询的返回结果不为空 & mappedstatement里边设置的resultmaps数量 > 查询数据库返回的resultset列数量,一直循环
     while (rsw != null && resultMapCount > resultSetCount) {
       //按照索引index,0 ,, 1,,来获取resultmap
       ResultMap resultMap = resultMaps.get(resultSetCount);
@@ -362,8 +362,11 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     }
   }
 
+  
   private void storeObject(ResultHandler resultHandler, DefaultResultContext resultContext, Object rowValue, ResultMapping parentMapping, ResultSet rs) throws SQLException {
+	//如果父类的mapping不为空,就是说存在嵌套情况  
     if (parentMapping != null) {
+      //
       linkToParents(rs, parentMapping, rowValue);
     } else {
       callResultHandler(resultHandler, resultContext, rowValue);
@@ -525,6 +528,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     List<PendingRelation> parents = pendingRelations.get(parentKey);
     for (PendingRelation parent : parents) {
       if (parent != null) {
+    	 //使用字段映射从metaobject中判断并且获取collection属性值
         final Object collectionProperty = instantiateCollectionPropertyIfAppropriate(parent.propertyMapping, parent.metaObject);
         if (rowValue != null) {
           if (collectionProperty != null) {
@@ -911,7 +915,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       if (mappedStatement.isResultOrdered()) { // issue #577 && #542
     	//如果没有根据缓存key获取到结果 && rowValue 不为空,为rowvalue创建缓存结果,  cachekey -- rowvalue
         if (partialObject == null && rowValue != null) {
-          //先清楚缓存结果
+          //先清除缓存结果
           nestedResultObjects.clear();
           
           storeObject(resultHandler, resultContext, rowValue, parentMapping, rsw.getResultSet());
