@@ -70,6 +70,11 @@ public class BaseExecutorTest extends BaseDataTest {
   }
 
   
+  
+  /**
+   * 带有自增主键的新增测试用例
+   * @throws Exception
+   */
   @Test
   public void shouldInsertNewAuthorWithBeforeAutoKey() throws Exception {
     //初始化一个SimpleExecutor，并且调用BaseExecutorTest构造方法初始化Configuration
