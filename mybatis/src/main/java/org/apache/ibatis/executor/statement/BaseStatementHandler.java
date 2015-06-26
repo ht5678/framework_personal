@@ -107,7 +107,7 @@ public abstract class BaseStatementHandler implements StatementHandler {
       statement = instantiateStatement(connection);
       //设置statement的超市时间
       setStatementTimeout(statement);
-      //TODO:
+      //mysql的fetchsize问题，http://blog.sina.com.cn/s/blog_670620330101n8dz.html
       setFetchSize(statement);
       //返回statement
       return statement;
@@ -140,6 +140,12 @@ public abstract class BaseStatementHandler implements StatementHandler {
     }
   }
 
+  
+  /**
+   * mysql的fetchsize问题，http://blog.sina.com.cn/s/blog_670620330101n8dz.html
+   * @param stmt
+   * @throws SQLException
+   */
   protected void setFetchSize(Statement stmt) throws SQLException {
     Integer fetchSize = mappedStatement.getFetchSize();
     if (fetchSize != null) {
