@@ -54,8 +54,7 @@ public class SimpleExecutor extends BaseExecutor {
     try {
       //获取配置类
       Configuration configuration = ms.getConfiguration();
-      //初始化RoutingStatementHandler，并且初始化RoutingStatementHandler的delegate，默认初始化PREPAREDStatementHandler
-      //如果有插件，安装插件
+      //初始化RoutingStatementHandler，并且初始化RoutingStatementHandler的delegate，默认初始化CallableStatementHandler
       StatementHandler handler = configuration.newStatementHandler(this, ms, parameter, RowBounds.DEFAULT, null, null);
       //初始化statement,并且设置配置参数
       stmt = prepareStatement(handler, ms.getStatementLog());
