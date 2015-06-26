@@ -344,17 +344,13 @@ public abstract class BaseExecutor implements Executor {
 
   private <E> List<E> queryFromDatabase(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
     List<E> list;
-    //在localCache中新增key的占位符
     localCache.putObject(key, EXECUTION_PLACEHOLDER);
     try {
       list = doQuery(ms, parameter, rowBounds, resultHandler, boundSql);
     } finally {
-      //移除key的占位符
       localCache.removeObject(key);
     }
-    //重新新增缓存数据，key-list(查询结果)
     localCache.putObject(key, list);
-    //如果statement是callable类型，将out参数缓存
     if (ms.getStatementType() == StatementType.CALLABLE) {
       localOutputParameterCache.putObject(key, parameter);
     }
