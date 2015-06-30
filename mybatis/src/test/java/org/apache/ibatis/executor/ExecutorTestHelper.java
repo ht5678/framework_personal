@@ -160,6 +160,12 @@ public class ExecutorTestHelper {
     return ms;
   }
 
+  
+  /**
+   *  组装author的查询 MappedStatement
+   * @param config
+   * @return
+   */
   public static MappedStatement prepareSelectOneAuthorMappedStatement(final Configuration config) {
     final TypeHandlerRegistry registry = config.getTypeHandlerRegistry();
 
