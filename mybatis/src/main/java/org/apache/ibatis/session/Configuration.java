@@ -563,7 +563,7 @@ public class Configuration {
    * @return
    */
   public StatementHandler newStatementHandler(Executor executor, MappedStatement mappedStatement, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) {
-    //初始化RoutingStatementHandler，并且初始化RoutingStatementHandler的delegate，默认初始化CallableStatementHandler
+    //初始化RoutingStatementHandler，并且初始化RoutingStatementHandler的delegate，默认初始化PREPAREDStatementHandler
     StatementHandler statementHandler = new RoutingStatementHandler(executor, mappedStatement, parameterObject, rowBounds, resultHandler, boundSql);
     //对StatementHandler安装插件
     statementHandler = (StatementHandler) interceptorChain.pluginAll(statementHandler);
