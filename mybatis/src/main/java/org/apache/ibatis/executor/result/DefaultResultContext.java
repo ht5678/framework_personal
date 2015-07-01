@@ -21,14 +21,19 @@ import org.apache.ibatis.session.ResultContext;
  * @author Clinton Begin
  */
 public class DefaultResultContext implements ResultContext {
-
+  //默认值为null
   private Object resultObject;
+  //默认值为0
   private int resultCount;
+  //默认值为false
   private boolean stopped;
 
   
   /**
-   * 构造函数,初始化DefaultResultContext
+   * 构造函数,初始化DefaultResultContext(数据库查询结果上下文)
+   * resultObject初始化为null
+   * resultCount初始化为0
+   * stopped初始化为false
    */
   public DefaultResultContext() {
     resultObject = null;

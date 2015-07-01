@@ -122,7 +122,9 @@ public class Configuration {
   protected ObjectWrapperFactory objectWrapperFactory = new DefaultObjectWrapperFactory();
   protected MapperRegistry mapperRegistry = new MapperRegistry(this);
 
+  //是否允许懒加载
   protected boolean lazyLoadingEnabled = false;
+  //懒加载使用的代理，默认初始化为cglibproxyfactory
   protected ProxyFactory proxyFactory;
 
   protected String databaseId;
@@ -332,6 +334,12 @@ public class Configuration {
     this.lazyLoadingEnabled = lazyLoadingEnabled;
   }
 
+  
+  /**
+   * explicitly  明白地，明确地;
+   *  初始化proxyFactory默认为CglibProxyFactory
+   * @return
+   */
   public ProxyFactory getProxyFactory() {
     if (proxyFactory == null) {
       // makes sure CGLIB is not needed unless explicitly requested

@@ -49,6 +49,12 @@ public class CglibProxyFactory implements ProxyFactory {
   private static final String FINALIZE_METHOD = "finalize";
   private static final String WRITE_REPLACE_METHOD = "writeReplace";
 
+  
+  /**
+   * 无参构造函数，初始化CglibProxyFactory
+   * 加载net.sf.cglib.proxy.Enhancer（cglib）
+   * 
+   */
   public CglibProxyFactory() {
     try {
       Resources.classForName("net.sf.cglib.proxy.Enhancer");
@@ -57,6 +63,9 @@ public class CglibProxyFactory implements ProxyFactory {
     }
   }
 
+  /**
+   * 使用内部类EnhancedResultObjectProxyImpl构建target类的代理
+   */
   public Object createProxy(Object target, ResultLoaderMap lazyLoader, Configuration configuration, ObjectFactory objectFactory, List<Class<?>> constructorArgTypes, List<Object> constructorArgs) {
     return EnhancedResultObjectProxyImpl.createProxy(target, lazyLoader, configuration, objectFactory, constructorArgTypes, constructorArgs);
   }
@@ -128,24 +137,27 @@ public class CglibProxyFactory implements ProxyFactory {
     private List<Class<?>> constructorArgTypes;
     private List<Object> constructorArgs;
 
+    
     /**
      * 构造函数
-     * @param type                              
-     * @param lazyLoader
-     * @param configuration
-     * @param objectFactory
-     * @param constructorArgTypes
-     * @param constructorArgs
+     * @param type                               要代理的对象类型                             
+     * @param lazyLoader                      TODO:
+     * @param configuration                   配置
+     * @param objectFactory                 objectFactory用来初始化对象
+     * @param constructorArgTypes       type的有参构造函数的参数类型和参数名
+     * @param constructorArgs               type的有参构造函数的参数类型和参数名
      */
     private EnhancedResultObjectProxyImpl(Class<?> type, ResultLoaderMap lazyLoader, Configuration configuration, ObjectFactory objectFactory, List<Class<?>> constructorArgTypes, List<Object> constructorArgs) {
     	//要代理的对象类型
       this.type = type;
       this.lazyLoader = lazyLoader;
-      //是否蓝家在aggressive，默认为true
+      //是否懒加载aggressive，默认为true
       this.aggressive = configuration.isAggressiveLazyLoading();
       //懒加载触发方法  "equals", "clone", "hashCode", "toString" 
       this.lazyLoadTriggerMethods = configuration.getLazyLoadTriggerMethods();
+      //objectFactory用来初始化对象
       this.objectFactory = objectFactory;
+      //type的有参构造函数的参数类型和参数名
       this.constructorArgTypes = constructorArgTypes;
       this.constructorArgs = constructorArgs;
     }
@@ -154,20 +166,24 @@ public class CglibProxyFactory implements ProxyFactory {
     /**
      * 构建target类的代理
      * @param target                            要构建代理的对象
-     * @param lazyLoader                     
+     * @param lazyLoader                     在DefaultResultSetHandler的getRowValue方法初始化
      * @param configuration                  配置类
-     * @param objectFactory                
-     * @param constructorArgTypes
-     * @param constructorArgs
+     * @param objectFactory                class实例化为object的工场                
+     * @param constructorArgTypes      构造函数的参数类型
+     * @param constructorArgs             构造函数的参数值
      * @return
      */
     public static Object createProxy(Object target, ResultLoaderMap lazyLoader, Configuration configuration, ObjectFactory objectFactory, List<Class<?>> constructorArgTypes, List<Object> constructorArgs) {
       final Class<?> type = target.getClass();
-      //初始化一个EnhancedResultObjectProxyImpl类
+      //初始化一个EnhancedResultObjectProxyImpl内部类
       EnhancedResultObjectProxyImpl callback = new EnhancedResultObjectProxyImpl(type, lazyLoader, configuration, objectFactory, constructorArgTypes, constructorArgs);
-      
+      //使用cglib创建代理对象
       Object enhanced = crateProxy(type, callback, constructorArgTypes, constructorArgs);
+      //target是type的初始化对象
+      //enhanced可能是type的代理对象
+      //将target对象的值赋值到enhanced，包括父类的字段赋值
       PropertyCopier.copyBeanProperties(type, target, enhanced);
+      //返回代理enhanced
       return enhanced;
     }
 

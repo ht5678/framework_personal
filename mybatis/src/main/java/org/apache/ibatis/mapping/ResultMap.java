@@ -200,6 +200,10 @@ public class ResultMap {
     return constructorResultMappings;
   }
 
+  /**
+   * id1,id2,  age就会在propertyResultMappings里边
+   * @return
+   */
   public List<ResultMapping> getPropertyResultMappings() {
     return propertyResultMappings;
   }

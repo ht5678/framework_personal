@@ -353,10 +353,15 @@ public class DefaultResultSetHandler implements ResultSetHandler {
 
   private void handleRowValuesForSimpleResultMap(ResultSetWrapper rsw, ResultMap resultMap, ResultHandler resultHandler, RowBounds rowBounds, ResultMapping parentMapping)
       throws SQLException {
+    //构造函数,初始化DefaultResultContext(数据库查询结果上下文)
     DefaultResultContext resultContext = new DefaultResultContext();
+    //根据RowBounds(内存分页)来将resultset跳转到第offset行,如果rowbounds是默认的NO_ROW_OFFSET,则不会定位到指定位置
     skipRows(rsw.getResultSet(), rowBounds);
+    //判断是否还有更多的row要处理,如果有的话，就将resultsetwrapper里边的resultset定位到下一个
     while (shouldProcessMoreRows(resultContext, rowBounds) && rsw.getResultSet().next()) {
+      //处理resultmap里边的Discriminator(switch)情况,将resultmap返回
       ResultMap discriminatedResultMap = resolveDiscriminatedResultMap(rsw.getResultSet(), resultMap, null);
+      
       Object rowValue = getRowValue(rsw, discriminatedResultMap);
       storeObject(resultHandler, resultContext, rowValue, parentMapping, rsw.getResultSet());
     }
@@ -398,7 +403,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
 
   
   /**
-   * 根据RowBounds来将resultset跳转到第offset行
+   * 根据RowBounds(内存分页)来将resultset跳转到第offset行,如果rowbounds是默认的NO_ROW_OFFSET,则不会定位到指定位置
    * @param rs
    * @param rowBounds
    * @throws SQLException
@@ -425,7 +430,9 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   //
 
   private Object getRowValue(ResultSetWrapper rsw, ResultMap resultMap) throws SQLException {
+    //实例化一个ResultLoaderMap，会在EnhancedResultObjectProxyImpl内部类中初始化代理的时候用到
     final ResultLoaderMap lazyLoader = new ResultLoaderMap();
+    
     Object resultObject = createResultObject(rsw, resultMap, lazyLoader, null);
     if (resultObject != null && !typeHandlerRegistry.hasTypeHandler(resultMap.getType())) {
       final MetaObject metaObject = configuration.newMetaObject(resultObject);
@@ -649,19 +656,55 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     //构造函数的参数value集合
     final List<Object> constructorArgs = new ArrayList<Object>();
     
+    //构造函数参数赋值
+    //创建返回对象，并且初始化对象构造函数的参数的value
+    // 并且将构造函数的参数的参数类型和参数值放到了constructorArgTypes  & constructorArgs
     final Object resultObject = createResultObject(rsw, resultMap, constructorArgTypes, constructorArgs, columnPrefix);
+    
+    //属性赋值
+    //如果返回对象不为null && 不是基本类型 （就是说如果返回对象是通过有参的构造函数初始化的）
     if (resultObject != null && !typeHandlerRegistry.hasTypeHandler(resultMap.getType())) {
+      //id1,id2,  age就会在propertyResultMappings里边
       final List<ResultMapping> propertyMappings = resultMap.getPropertyResultMappings();
+      //遍历所有的属性mapping
       for (ResultMapping propertyMapping : propertyMappings) {
         //如果支持懒加载，并且是带有嵌套查询的
         if (propertyMapping.getNestedQueryId() != null && propertyMapping.isLazy()) { // issue gcode #109 && issue #149
+          //默认使用CglibProxyFactory
           return configuration.getProxyFactory().createProxy(resultObject, lazyLoader, configuration, objectFactory, constructorArgTypes, constructorArgs);
         }
       }
     }
+    
+    //返回赋值后的结果对象
     return resultObject;
   }
 
+  
+  /**
+   * 
+   * 如果resultMap.getType()返回对象类型是基本类型：
+   * 获取resultmap的第一个resultmapping，并且根据它从ResultSetWrapper获取数据库查询的value返回
+   * 
+   * 如果resultType不是基本类型，而且是一个构造函数有参数的对象
+   * 返回构造函数带有参数的结果对象,并且将构造函数的参数的参数类型和参数值放到了constructorArgTypes  & constructorArgs
+   * 
+   * 如果返回类型不是基本类型，也不是带有参数构造函数的对象
+   * 根据type实例化对象，参赛类型为null,参数value为null
+   * 
+   * 
+   * 总结：
+   * 创建返回对象，并且初始化对象构造函数的参数的value
+   * 并且将构造函数的参数的参数类型和参数值放到了constructorArgTypes  & constructorArgs
+   * 
+   * @param rsw
+   * @param resultMap
+   * @param constructorArgTypes
+   * @param constructorArgs
+   * @param columnPrefix
+   * @return
+   * @throws SQLException
+   */
   private Object createResultObject(ResultSetWrapper rsw, ResultMap resultMap, List<Class<?>> constructorArgTypes, List<Object> constructorArgs, String columnPrefix)
       throws SQLException {
 	/*
@@ -675,41 +718,97 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     //name  ,  phone就会在constructorResultMappings里边
     final List<ResultMapping> constructorMappings = resultMap.getConstructorResultMappings();
     //如果resulttype是typeHandlerRegistry里边注册的基本类型
+    // 获取resultmap的第一个resultmapping，并且根据它从ResultSetWrapper获取数据库查询的value返回
     if (typeHandlerRegistry.hasTypeHandler(resultType)) {
-      
+      //获取resultmap的第一个resultmapping，并且根据它从ResultSetWrapper获取数据库查询的value返回
       return createPrimitiveResultObject(rsw, resultMap, columnPrefix);
+      
+      
+      //如果resultType不是基本类型，而且是一个构造函数有参数的对象
     } else if (constructorMappings.size() > 0) {
+      //返回构造函数带有参数的结果对象,并且将构造函数的参数的参数类型和参数值放到了constructorArgTypes  & constructorArgs
       return createParameterizedResultObject(rsw, resultType, constructorMappings, constructorArgTypes, constructorArgs, columnPrefix);
+      
+      //如果返回类型不是基本类型，也不是带有参数构造函数的对象，
+      //根据type实例化对象，参赛类型为null,参数value为null
     } else {
       return objectFactory.create(resultType);
     }
   }
 
+  
+  /**
+   * 遍历constructorMappings，尝试从ResultSetWrapper获取mapping的value
+   * 如果至少有一个parameter可以获取到value， foundvalues = true,objectfactory使用构造函数来初始化对象返回
+   * 如果没有获取到value，就返回null
+   * 
+   * 总结：
+   * 返回构造函数带有参数的结果对象
+   * 
+   * @param rsw
+   * @param resultType
+   * @param constructorMappings
+   * @param constructorArgTypes
+   * @param constructorArgs
+   * @param columnPrefix
+   * @return
+   * @throws SQLException
+   */
   private Object createParameterizedResultObject(ResultSetWrapper rsw, Class<?> resultType, List<ResultMapping> constructorMappings, List<Class<?>> constructorArgTypes,
       List<Object> constructorArgs, String columnPrefix) throws SQLException {
     boolean foundValues = false;
+    //遍历所有的构造函数的resultmapping，并且尝试获取constructor的参数值，如果获取了一个以上，就用objectFactory初始化对象返回
     for (ResultMapping constructorMapping : constructorMappings) {
+      //获取mapping的type和columnName
       final Class<?> parameterType = constructorMapping.getJavaType();
       final String column = constructorMapping.getColumn();
       final Object value;
+      //TODO：嵌套查询情况
       if (constructorMapping.getNestedQueryId() != null) {
         value = getNestedQueryConstructorValue(rsw.getResultSet(), constructorMapping, columnPrefix);
+        
+        //TODO：嵌套resultmap情况
       } else if (constructorMapping.getNestedResultMapId() != null) {
         final ResultMap resultMap = configuration.getResultMap(constructorMapping.getNestedResultMapId());
         value = getRowValue(rsw, resultMap);
+        
+        //如果没有嵌套查询情况和嵌套的结果情况，就使用columnName从resultsetWrapper中获取value
       } else {
         final TypeHandler<?> typeHandler = constructorMapping.getTypeHandler();
         value = typeHandler.getResult(rsw.getResultSet(), prependPrefix(column, columnPrefix));
       }
+      //将构造函数的参数类型和参数值添加到集合里边
       constructorArgTypes.add(parameterType);
       constructorArgs.add(value);
+      //判断所有的参数是否至少有一个是非空的
       foundValues = value != null || foundValues;
     }
+    //如果至少有一个parameter可以获取值，就使用objectfactory使用构造函数来初始化对象，否则，返回null
     return foundValues ? objectFactory.create(resultType, constructorArgTypes, constructorArgs) : null;
   }
 
   
-  
+  /**
+   * Primitive 原生的
+   * 
+   * 例如：
+   * @select("select sname from student where id=2")
+   * public String selectStudent();
+   * 
+   * 如果resultmap中的resultmapping>0：
+   * 从resultmap中获取第一个resultmapping的columnName(可能有前缀),然后从resultsetwrapper里边通过columnName来获取value返回
+   * 如果resultmap中的resultmapping=0：
+   * 获取（resultset结果的所有列名或者是sql as集合）   的第一个列名,然后从resultsetwrapper里边通过columnName来获取value返回
+   * 
+   * 总结(只在返回类型是基本类型情况下)：
+   * 获取resultmap的第一个resultmapping，并且根据它从ResultSetWrapper获取数据库查询的value返回
+   * 
+   * @param rsw
+   * @param resultMap
+   * @param columnPrefix
+   * @return
+   * @throws SQLException
+   */
   private Object createPrimitiveResultObject(ResultSetWrapper rsw, ResultMap resultMap, String columnPrefix) throws SQLException {
 	//获取要返回的对象类型resulttype
     final Class<?> resultType = resultMap.getType();
@@ -722,7 +821,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       //如果有prefix,将返回(prefix+columnName),否则返回columnname
       columnName = prependPrefix(mapping.getColumn(), columnPrefix);
       
-      //如果resultmap里边没有设置字段映射,获取resultset结果的所有列名或者是sql as集合的第一个列名
+      //如果resultmap里边没有设置字段映射,获取（resultset结果的所有列名或者是sql as集合）   的第一个列名
     } else {
       columnName = rsw.getColumnNames().get(0);
     }
@@ -884,12 +983,12 @@ public class DefaultResultSetHandler implements ResultSetHandler {
    * @param prefix
    * @return
    */
-  private String prependPrefix(String columnName, String prefix) {
-    if (columnName == null || columnName.length() == 0 || prefix == null || prefix.length() == 0) {
-      return columnName;
-    }
-    return prefix + columnName;
-  }
+    private String prependPrefix(String columnName, String prefix) {
+        if (columnName == null || columnName.length() == 0 || prefix == null || prefix.length() == 0) {
+          return columnName;
+        }
+        return prefix + columnName;
+      }
 
   //
   // HANDLE NESTED RESULT MAPS
