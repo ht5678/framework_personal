@@ -196,7 +196,13 @@ public abstract class BaseExecutor implements Executor {
 
   
   /**
-   * 构建cachekey，并且返回
+   * 根据
+   *    MappedStatement的id , 
+   *    内存分页的offset和limit，
+   *    sql语句，
+   *    parametermapping(参数)的属性名和值
+   * 来构建cachekey,并且返回
+   * 
    */
   public CacheKey createCacheKey(MappedStatement ms, Object parameterObject, RowBounds rowBounds, BoundSql boundSql) {
     if (closed) throw new ExecutorException("Executor was closed.");

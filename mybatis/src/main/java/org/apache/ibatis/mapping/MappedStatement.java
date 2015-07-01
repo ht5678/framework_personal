@@ -95,7 +95,7 @@ public final class MappedStatement {
      * 构造函数
      * @param configuration         配置类
      * @param id                          MappedStatement的id
-     * @param sqlSource               sql相关类
+     * @param sqlSource               sql相关类,默认为StaticSqlSource
      * @param sqlCommandType    操作类型枚举
      */
     public Builder(Configuration configuration, String id, SqlSource sqlSource, SqlCommandType sqlCommandType) {

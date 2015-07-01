@@ -25,6 +25,8 @@ import org.apache.ibatis.session.Configuration;
 /**
  * 
  * 不需要组装变量#{xxx},直接就可以执行的sql语句
+ * 例如：SELECT * FROM author WHERE id = ?       对
+ *           SELECT * FROM author WHERE id = #{id} 错
  * 
  * @author Clinton Begin
  */

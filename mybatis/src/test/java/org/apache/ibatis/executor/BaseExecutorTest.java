@@ -48,7 +48,6 @@ public class BaseExecutorTest extends BaseDataTest {
 
   @BeforeClass
   public static void setup() throws Exception {
-      
     ds = createBlogDataSource();
   }
 
