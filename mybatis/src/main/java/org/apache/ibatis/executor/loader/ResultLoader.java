@@ -66,12 +66,26 @@ public class ResultLoader {
     this.creatorThreadId = Thread.currentThread().getId();
   }
 
+  
+  /**
+   * 执行懒加载的查询，嵌套查询默认为懒加载
+   * @return
+   * @throws SQLException
+   */
   public Object loadResult() throws SQLException {
+	  //数据库查询
     List<Object> list = selectList();
+    //将结果数据组装成返回对象返回
     resultObject = resultExtractor.extractObjectFromList(list, targetType);
     return resultObject;
   }
 
+  
+  /**
+   * 数据库查询
+   * @return
+   * @throws SQLException
+   */
   private <E> List<E> selectList() throws SQLException {
     Executor localExecutor = executor;
     if (Thread.currentThread().getId() != this.creatorThreadId || localExecutor.isClosed()) {

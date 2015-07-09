@@ -114,6 +114,7 @@ public class Configuration {
   protected Set<String> lazyLoadTriggerMethods = new HashSet<String>(Arrays.asList(new String[] { "equals", "clone", "hashCode", "toString" }));
   protected Integer defaultStatementTimeout;
   protected ExecutorType defaultExecutorType = ExecutorType.SIMPLE;
+  //默认值：Will only auto-map results with no nested result mappings defined inside.
   protected AutoMappingBehavior autoMappingBehavior = AutoMappingBehavior.PARTIAL;
 
   protected Properties variables = new Properties();
@@ -314,6 +315,10 @@ public class Configuration {
     this.environment = environment;
   }
 
+  /**
+   * 默认值：Will only auto-map results with no nested result mappings defined inside.
+   * @return
+   */
   public AutoMappingBehavior getAutoMappingBehavior() {
     return autoMappingBehavior;
   }

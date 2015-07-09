@@ -65,7 +65,8 @@ public class ResultLoaderMap {
               "' for query id '" + resultLoader.mappedStatement.getId() +
               " already exists in the result map. The leftmost property of all lazy loaded properties must be unique within a result map.");
     }
-    
+    //将loadpair（嵌套查询的懒加载信息）存到loadermap里边,后面调用代理对象的方法的时候，会经过EnhancedResultObjectProxyImpl的intercept方法
+    //会做判断，如果loadermap.size()>0,会执行懒加载的嵌套查询loadpair.load()，然后将查询结果set到代理对象里边
     loaderMap.put(upperFirst, new LoadPair(property, metaResultObject, resultLoader));
   }
 
@@ -192,6 +193,12 @@ public class ResultLoaderMap {
       }
     }
 
+    
+    /**
+     * loadpair的load方法
+     * 调用load(object)方法来执行懒加载的查询
+     * @throws SQLException
+     */
     public void load() throws SQLException {
       /* These field should not be null unless the loadpair was serialized.
        * Yet in that case this method should not be called. */
@@ -201,14 +208,23 @@ public class ResultLoaderMap {
       this.load(null);
     }
 
+    
+    /**
+     * 执行懒加载查询，获取数据并且set到userObject中返回
+     * @param userObject
+     * @throws SQLException
+     */
     public void load(final Object userObject) throws SQLException {
+    	
+    	//合法性校验
       if (this.metaResultObject == null || this.resultLoader == null) {
         if (this.mappedParameter == null) {
           throw new ExecutorException("Property [" + this.property + "] cannot be loaded because "
                   + "required parameter of mapped statement ["
                   + this.mappedStatement + "] is not serializable.");
         }
-
+        
+        //获取mappedstatement并且校验
         final Configuration config = this.getConfiguration();
         final MappedStatement ms = config.getMappedStatement(this.mappedStatement);
         if (ms == null) {
@@ -218,6 +234,7 @@ public class ResultLoaderMap {
                   + this.mappedStatement + "]");
         }
 
+        //使用userObject构建metaobject,并且重新构建resultloader对象
         this.metaResultObject = config.newMetaObject(userObject);
         this.resultLoader = new ResultLoader(config, new ClosedExecutor(), ms, this.mappedParameter,
                 metaResultObject.getSetterType(this.property), null, null);
@@ -233,6 +250,7 @@ public class ResultLoaderMap {
                 old.parameterObject, old.targetType, old.cacheKey, old.boundSql);
       }
 
+     //获取数据库查询结果并且set到结果对象返回
       this.metaResultObject.setValue(property, this.resultLoader.loadResult());
     }
 

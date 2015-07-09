@@ -432,11 +432,17 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   private Object getRowValue(ResultSetWrapper rsw, ResultMap resultMap) throws SQLException {
     //实例化一个ResultLoaderMap，会在EnhancedResultObjectProxyImpl内部类中初始化代理的时候用到
     final ResultLoaderMap lazyLoader = new ResultLoaderMap();
-    
+    //根据resultmap的resulttype来初始化返回对象，如果对象的属性有嵌套查询并且支持懒加载，就返回代理对象，否则返回原生结果对象
     Object resultObject = createResultObject(rsw, resultMap, lazyLoader, null);
+    //如果结果对象不为空，并且不是基本类型
     if (resultObject != null && !typeHandlerRegistry.hasTypeHandler(resultMap.getType())) {
+      
       final MetaObject metaObject = configuration.newMetaObject(resultObject);
+      //name  ,  phone就会在constructorResultMappings里边
+      //如果对象的构造函数的参数mapping>0，说明foundValues=true
       boolean foundValues = resultMap.getConstructorResultMappings().size() > 0;
+      
+      //configuration.getAutoMappingBehavior()默认值是PARTICAL，所以第二个参数是true,就是说默认是自动匹配的PARTICAL
       if (shouldApplyAutomaticMappings(resultMap, !AutoMappingBehavior.NONE.equals(configuration.getAutoMappingBehavior()))) {        
         foundValues = applyAutomaticMappings(rsw, resultMap, metaObject, null) || foundValues;
       }
@@ -496,6 +502,25 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     }
   }
 
+  
+  
+  /**
+   * 参数介绍：
+   * ResultSetWrapper	- 可以从里边获取resultset，里边包含着数据库的查询结果
+   * MetaObject				- 方法返回类型的实例
+   * ResultMap				- ResultMapping的集合
+   * 
+   * 这个方法的主要作用是根据resultmapping从resultset中获取value，然后将value赋值到metaobject里边
+   * 但是这个方法里边只有基本类型的属性会被赋值，如果是对象或者集合（嵌套查询），就可能会启动懒加载，
+   * 不会一开始就执行嵌套查询的加载
+   * 
+   * @param rsw
+   * @param resultMap
+   * @param metaObject
+   * @param columnPrefix
+   * @return
+   * @throws SQLException
+   */
   private boolean applyAutomaticMappings(ResultSetWrapper rsw, ResultMap resultMap, MetaObject metaObject, String columnPrefix) throws SQLException {
     final List<String> unmappedColumnNames = rsw.getUnmappedColumnNames(resultMap, columnPrefix);
     boolean foundValues = false;
@@ -649,7 +674,33 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   //
   // INSTANTIATION & CONSTRUCTOR MAPPING
   //
-
+	/**
+	 * 根据查询的结果类型，
+	 * 如果resultMap.getType()返回对象类型是基本类型：
+	 * 获取resultmap的第一个resultmapping，并且根据它从ResultSetWrapper获取数据库查询的value返回
+	 * 
+	 * 如果resultType不是基本类型，而且是一个构造函数有参数的对象
+	 * 返回构造函数带有参数的结果对象,并且将构造函数的参数的参数类型和参数值放到了constructorArgTypes  & constructorArgs
+	 * 
+	 * 如果返回类型不是基本类型，也不是带有参数构造函数的对象
+	 * 根据type实例化对象，参赛类型为null,参数value为null
+	 * 
+	 * 初始化一个对象，可能会初始化构造函数参数，然后再根据PropertyResultMappings来遍历：
+	 * 判断 propertyMapping 是否支持懒加载，并且是带有嵌套查询的,就返回代理对象
+	 * 如果 propertyMapping有符合条件的，就返回代理对象
+	 * 如果没有，就返回原生对象
+	 * 
+	 * 总结：
+	 * 根据resultmap的resulttype来初始化返回对象，如果对象的属性有嵌套查询并且支持懒加载，
+	 * 就返回代理对象，否则返回原生结果对象
+	 * 
+	 * @param rsw
+	 * @param resultMap
+	 * @param lazyLoader
+	 * @param columnPrefix
+	 * @return
+	 * @throws SQLException
+	 */
   private Object createResultObject(ResultSetWrapper rsw, ResultMap resultMap, ResultLoaderMap lazyLoader, String columnPrefix) throws SQLException {
 	  //构造函数的参数类型集合
     final List<Class<?>> constructorArgTypes = new ArrayList<Class<?>>();
@@ -668,15 +719,15 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       final List<ResultMapping> propertyMappings = resultMap.getPropertyResultMappings();
       //遍历所有的属性mapping
       for (ResultMapping propertyMapping : propertyMappings) {
-        //如果支持懒加载，并且是带有嵌套查询的
+        //如果支持懒加载，并且是带有嵌套查询的,就返回代理对象
         if (propertyMapping.getNestedQueryId() != null && propertyMapping.isLazy()) { // issue gcode #109 && issue #149
-          //默认使用CglibProxyFactory
+          //默认使用CglibProxyFactory，创建resultObject()对象的代理返回
           return configuration.getProxyFactory().createProxy(resultObject, lazyLoader, configuration, objectFactory, constructorArgTypes, constructorArgs);
         }
       }
     }
     
-    //返回赋值后的结果对象
+    //返回赋值后的原生结果对象，而不是代理对象
     return resultObject;
   }
 
