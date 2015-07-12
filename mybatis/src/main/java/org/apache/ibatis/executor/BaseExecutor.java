@@ -184,12 +184,24 @@ public abstract class BaseExecutor implements Executor {
     return list;
   }
 
+  
+  /**
+   * 如果key被缓存了，就尝试加载，如果key没有被缓存，就将DeferredLoad放到deferredLoads里边，
+   * 然后在queryFromDatabase后遍历加载缓存
+   * 
+   * 总结：
+   * 缓存加载value到resultobject
+   * 
+   */
   public void deferLoad(MappedStatement ms, MetaObject resultObject, String property, CacheKey key, Class<?> targetType) {
     if (closed) throw new ExecutorException("Executor was closed.");
     DeferredLoad deferredLoad = new DeferredLoad(resultObject, property, key, localCache, configuration, targetType);
+    //如果key被缓存了，就可以直接加载，并且将value赋值到resultobject中
     if (deferredLoad.canLoad()) {
     	deferredLoad.load();
     } else {
+    	//如果key没有被缓存，将DeferredLoad放到deferredLoads中，然后等BaseExecutor.query.(...)执行完以后，会遍历deferredLoads
+    	//然后加载缓存的属性并且将value赋值到resultObject
     	deferredLoads.add(new DeferredLoad(resultObject, property, key, localCache, configuration, targetType));
     }
   }

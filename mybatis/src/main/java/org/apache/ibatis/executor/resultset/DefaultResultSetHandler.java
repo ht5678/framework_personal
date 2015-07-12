@@ -443,9 +443,12 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       boolean foundValues = resultMap.getConstructorResultMappings().size() > 0;
       
       //configuration.getAutoMappingBehavior()默认值是PARTICAL，所以第二个参数是true,就是说默认是自动匹配的PARTICAL
-      if (shouldApplyAutomaticMappings(resultMap, !AutoMappingBehavior.NONE.equals(configuration.getAutoMappingBehavior()))) {        
+      if (shouldApplyAutomaticMappings(resultMap, !AutoMappingBehavior.NONE.equals(configuration.getAutoMappingBehavior()))) {
+    	//基本类型的属性被赋值
         foundValues = applyAutomaticMappings(rsw, resultMap, metaObject, null) || foundValues;
       }
+      //有嵌套查询类型的属性，如果启用懒加载，就初始化一个loadpair放到resultloader里边
+      //如果没有启动懒加载，就将查询出来的value赋值到metaobject的属性里
       foundValues = applyPropertyMappings(rsw, resultMap, metaObject, lazyLoader, null) || foundValues;
       foundValues = lazyLoader.size() > 0 || foundValues;
       resultObject = foundValues ? resultObject : null;
@@ -461,20 +464,46 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   //
   // PROPERTY MAPPINGS
   //
-
+  /**
+   * 
+   * 获取那些在xml文件或者@results中设置的匹配属性
+   * 	缓存获取
+   * 	懒加载（事件触发获取）
+   * 	直接获取
+   * 
+   * 
+   * 获取在xml文件或者@results中设置的匹配属性的映射值
+   * @param rsw
+   * @param resultMap
+   * @param metaObject
+   * @param lazyLoader
+   * @param columnPrefix
+   * @return
+   * @throws SQLException
+   */
   private boolean applyPropertyMappings(ResultSetWrapper rsw, ResultMap resultMap, MetaObject metaObject, ResultLoaderMap lazyLoader, String columnPrefix)
       throws SQLException {
+	//通过(resultmapId:columnPrefix)获取当前resultset(数据库返回列) & resultmapping(类属性)  并集
+	 //被匹配的字段名，这是些在xml文件或者@results中设置的匹配字段
     final List<String> mappedColumnNames = rsw.getMappedColumnNames(resultMap, columnPrefix);
     boolean foundValues = false;
+    //id1,id2,  age就会在propertyResultMappings里边
     final List<ResultMapping> propertyMappings = resultMap.getPropertyResultMappings();
+    //遍历所有在xml文件或者@results中设置的匹配字段
     for (ResultMapping propertyMapping : propertyMappings) {
+      //如果有prefix,将返回(prefix+columnName),否则返回columnname
       final String column = prependPrefix(propertyMapping.getColumn(), columnPrefix);
+      
       if (propertyMapping.isCompositeResult() 
           || (column != null && mappedColumnNames.contains(column.toUpperCase(Locale.ENGLISH))) 
           || propertyMapping.getResultSet() != null) {
+    	//获取属性对应的数据库value返回，可能会是懒加载属性&缓存，会返回value=NO_VALUE，然后将懒加载属性加到loadermap里边
         Object value = getPropertyMappingValue(rsw.getResultSet(), metaObject, propertyMapping, lazyLoader, columnPrefix);
+        //获取属性名
         final String property = propertyMapping.getProperty(); // issue #541 make property optional
+        //如果value不为空就将value赋值到property上
         if (value != NO_VALUE && property != null && (value != null || configuration.isCallSettersOnNulls())) { // issue #377, call setter on nulls
+          //赋值
           if (value != null || !metaObject.getSetterType(property).isPrimitive()) {
             metaObject.setValue(property, value);
           }
@@ -485,8 +514,25 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     return foundValues;
   }
 
+  
+  /**
+   * 
+   * 如果属性是嵌套查询类型的
+   * 	获取嵌套查询属性对应的value并且返回
+   * TODO:
+   * 
+   * 获取属性对应的数据库value返回
+   * @param rs
+   * @param metaResultObject
+   * @param propertyMapping
+   * @param lazyLoader
+   * @param columnPrefix
+   * @return
+   * @throws SQLException
+   */
   private Object getPropertyMappingValue(ResultSet rs, MetaObject metaResultObject, ResultMapping propertyMapping, ResultLoaderMap lazyLoader, String columnPrefix)
       throws SQLException {
+	 //如果这个属性是带有嵌套查询的,获取嵌套查询属性对应的value并且返回
     if (propertyMapping.getNestedQueryId() != null) {
       return getNestedQueryMappingValue(rs, metaResultObject, propertyMapping, lazyLoader, columnPrefix);
     } else if (propertyMapping.getResultSet() != null) {
@@ -514,6 +560,8 @@ public class DefaultResultSetHandler implements ResultSetHandler {
    * 但是这个方法里边只有基本类型的属性会被赋值，如果是对象或者集合（嵌套查询），就可能会启动懒加载，
    * 不会一开始就执行嵌套查询的加载
    * 
+   * 默认自动匹配的mapping
+   * 
    * @param rsw
    * @param resultMap
    * @param metaObject
@@ -522,6 +570,8 @@ public class DefaultResultSetHandler implements ResultSetHandler {
    * @throws SQLException
    */
   private boolean applyAutomaticMappings(ResultSetWrapper rsw, ResultMap resultMap, MetaObject metaObject, String columnPrefix) throws SQLException {
+    //没有被匹配的字段，就是那些没有在xml配置文件或者@results的字段，
+	  //跟方法名一样的默认自动匹配的mapping
     final List<String> unmappedColumnNames = rsw.getUnmappedColumnNames(resultMap, columnPrefix);
     boolean foundValues = false;
     for (String columnName : unmappedColumnNames) {
@@ -902,6 +952,26 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     return value;
   }
 
+  
+  /**
+   * 
+   * 如果支持缓存，
+   * 	尝试缓存加载value，并且将value赋值到resultobject里边
+   * 如果支持懒加载，
+   *  	将初始化的loadpair添加到loadermap里边
+   * 如果都不支持,
+   * 	直接查询value
+   * 
+   * 总结：获取嵌套查询属性对应的value并且返回
+   * 
+   * @param rs
+   * @param metaResultObject
+   * @param propertyMapping
+   * @param lazyLoader
+   * @param columnPrefix
+   * @return
+   * @throws SQLException
+   */
   private Object getNestedQueryMappingValue(ResultSet rs, MetaObject metaResultObject, ResultMapping propertyMapping, ResultLoaderMap lazyLoader, String columnPrefix)
       throws SQLException {
     final String nestedQueryId = propertyMapping.getNestedQueryId();
@@ -912,15 +982,19 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     Object value = NO_VALUE;
     if (nestedQueryParameterObject != null) {
       final BoundSql nestedBoundSql = nestedQuery.getBoundSql(nestedQueryParameterObject);
+      //生成唯一cachekey
       final CacheKey key = executor.createCacheKey(nestedQuery, nestedQueryParameterObject, RowBounds.DEFAULT, nestedBoundSql);
       final Class<?> targetType = propertyMapping.getJavaType();
+      //如果key被缓存过，就尝试从缓存加载value到resultobject
       if (executor.isCached(nestedQuery, key)) {
         executor.deferLoad(nestedQuery, metaResultObject, property, key, targetType);
       } else {
+    	//初始化resultloader
         final ResultLoader resultLoader = new ResultLoader(configuration, executor, nestedQuery, nestedQueryParameterObject, targetType, key, nestedBoundSql);
+        //如果启用了懒加载，初始化一个loadpair到loadermap里边，如果没有启用，直接获取value并且返回
         if (propertyMapping.isLazy()) {
           lazyLoader.addLoader(property, metaResultObject, resultLoader);
-        } else {
+        } else {//直接加载
           value = resultLoader.loadResult();
         }
       }
@@ -1087,7 +1161,25 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   //
   // GET VALUE FROM ROW FOR NESTED RESULT MAP
   //
-
+  /**
+   * 1.获取那些自动匹配（驼峰法）的属性value，然后赋值到metaobject
+   * 
+   * 2.获取那些在xml文件或者@results中设置的匹配属性
+   * 	缓存获取
+   * 	懒加载（事件触发获取）
+   * 	直接获取
+   * 
+   * 
+   * 
+   * @param rsw
+   * @param resultMap
+   * @param combinedKey
+   * @param absoluteKey
+   * @param columnPrefix
+   * @param partialObject
+   * @return
+   * @throws SQLException
+   */
   private Object getRowValue(ResultSetWrapper rsw, ResultMap resultMap, CacheKey combinedKey, CacheKey absoluteKey, String columnPrefix, Object partialObject) throws SQLException {
     final String resultMapId = resultMap.getId();
     Object resultObject = partialObject;
@@ -1107,9 +1199,11 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       if (resultObject != null && !typeHandlerRegistry.hasTypeHandler(resultMap.getType())) {
         final MetaObject metaObject = configuration.newMetaObject(resultObject);
         boolean foundValues = resultMap.getConstructorResultMappings().size() > 0;
+        //获取那些自动匹配（驼峰法）的属性value，然后赋值到metaobject
         if (shouldApplyAutomaticMappings(resultMap, AutoMappingBehavior.FULL.equals(configuration.getAutoMappingBehavior()))) {
           foundValues = applyAutomaticMappings(rsw, resultMap, metaObject, columnPrefix) || foundValues;
         }        
+        //获取那些在xml文件或者@results中设置的匹配属性value
         foundValues = applyPropertyMappings(rsw, resultMap, metaObject, lazyLoader, columnPrefix) || foundValues;
         putAncestor(absoluteKey, resultObject, resultMapId, columnPrefix);
         foundValues = applyNestedResultMappings(rsw, resultMap, metaObject, columnPrefix, combinedKey, true) || foundValues;
