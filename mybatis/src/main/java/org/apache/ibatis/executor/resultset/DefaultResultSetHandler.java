@@ -361,7 +361,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     while (shouldProcessMoreRows(resultContext, rowBounds) && rsw.getResultSet().next()) {
       //处理resultmap里边的Discriminator(switch)情况,将resultmap返回
       ResultMap discriminatedResultMap = resolveDiscriminatedResultMap(rsw.getResultSet(), resultMap, null);
-      
+      //处理一行数据组装的对象返回
       Object rowValue = getRowValue(rsw, discriminatedResultMap);
       storeObject(resultHandler, resultContext, rowValue, parentMapping, rsw.getResultSet());
     }
@@ -371,9 +371,10 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   private void storeObject(ResultHandler resultHandler, DefaultResultContext resultContext, Object rowValue, ResultMapping parentMapping, ResultSet rs) throws SQLException {
 	//如果父类的mapping不为空,就是说存在嵌套情况  
     if (parentMapping != null) {
-      //
+      //给parent映射字段赋值rowvalue
       linkToParents(rs, parentMapping, rowValue);
     } else {
+       
       callResultHandler(resultHandler, resultContext, rowValue);
     }
   }
@@ -428,7 +429,13 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   //
   // GET VALUE FROM ROW FOR SIMPLE RESULT MAP
   //
-
+  /**
+   * 处理一行数据组装的对象返回
+   * @param rsw
+   * @param resultMap
+   * @return
+   * @throws SQLException
+   */
   private Object getRowValue(ResultSetWrapper rsw, ResultMap resultMap) throws SQLException {
     //实例化一个ResultLoaderMap，会在EnhancedResultObjectProxyImpl内部类中初始化代理的时候用到
     final ResultLoaderMap lazyLoader = new ResultLoaderMap();
@@ -535,7 +542,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
 	 //如果这个属性是带有嵌套查询的,获取嵌套查询属性对应的value并且返回
     if (propertyMapping.getNestedQueryId() != null) {
       return getNestedQueryMappingValue(rs, metaResultObject, propertyMapping, lazyLoader, columnPrefix);
-    } else if (propertyMapping.getResultSet() != null) {
+    } else if (propertyMapping.getResultSet() != null) {//如果这个属性不是嵌套查询并且
       addPendingChildRelation(rs, metaResultObject, propertyMapping);
       return NO_VALUE;
     } else if (propertyMapping.getNestedResultMapId() != null) {
@@ -604,19 +611,39 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   }
 
   // MULTIPLE RESULT SETS
-
+  /**
+   * 构建parentkey，根据parentkey来尝试获取PendingRelation集合
+   * 判断parent映射
+   * 如果是集合类型
+   *    将rowvalue作为元素添加到集合中
+   * 如果不是集合
+   *    将rowvalue赋值给parent映射
+   *    
+   * 总结：
+   *    给parent映射字段赋值rowvalue
+   *    
+   * @param rs
+   * @param parentMapping
+   * @param rowValue
+   * @throws SQLException
+   */
   private void linkToParents(ResultSet rs, ResultMapping parentMapping, Object rowValue) throws SQLException {
+     //构建唯一cachekey 
     CacheKey parentKey = createKeyForMultipleResults(rs, parentMapping, parentMapping.getColumn(), parentMapping.getForeignColumn());
+    //尝试使用parentkey从pendingRelations获取PendingRelation集合
     List<PendingRelation> parents = pendingRelations.get(parentKey);
+    //循环遍历PendingRelation
     for (PendingRelation parent : parents) {
       if (parent != null) {
-    	 //使用字段映射从metaobject中判断并且获取collection属性值
+    	 //使用字段映射从metaobject中判断并且获取collection属性值，就是判断父类映射是不是一个集合类型的
         final Object collectionProperty = instantiateCollectionPropertyIfAppropriate(parent.propertyMapping, parent.metaObject);
+        //如果resultset一行的值组成的对象rowvalue不为空
         if (rowValue != null) {
+            //如果父类映射属性是集合类型,就将rowvalue作为子元素添加到集合里边
           if (collectionProperty != null) {
             final MetaObject targetMetaObject = configuration.newMetaObject(collectionProperty);
             targetMetaObject.add(rowValue);
-          } else {
+          } else {//如果父类不是集合类型，就直接将rowvalue作为值赋值给parent属性
             parent.metaObject.setValue(parent.propertyMapping.getProperty(), rowValue);
           }
         }
@@ -704,6 +731,24 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     }
   }
 
+  
+  /**
+   * 
+   * cachekey的组成元素
+   * resultMapping
+   * names[i]
+   * value[i]
+   * 
+   * 总结：
+   * 构建唯一cachekey
+   * 
+   * @param rs
+   * @param resultMapping
+   * @param names
+   * @param columns
+   * @return
+   * @throws SQLException
+   */
   private CacheKey createKeyForMultipleResults(ResultSet rs, ResultMapping resultMapping, String names, String columns) throws SQLException {
     CacheKey cacheKey = new CacheKey();
     cacheKey.update(resultMapping);
