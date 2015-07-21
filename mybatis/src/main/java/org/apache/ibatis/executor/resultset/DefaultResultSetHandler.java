@@ -1169,7 +1169,8 @@ public class DefaultResultSetHandler implements ResultSetHandler {
    * 	懒加载（事件触发获取）
    * 	直接获取
    * 
-   * 
+   * 总结：
+   * 获取resultset一行数据的value，并且赋值到partialObject返回
    * 
    * @param rsw
    * @param resultMap
