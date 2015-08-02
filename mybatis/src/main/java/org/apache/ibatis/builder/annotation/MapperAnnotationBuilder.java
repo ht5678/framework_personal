@@ -244,8 +244,11 @@ public class MapperAnnotationBuilder {
   }
 
   void parseStatement(Method method) {
+	 //获取方法的参数类型（忽略rowbounds & resulthandler）
     Class<?> parameterTypeClass = getParameterType(method);
+    //获取方法的语言驱动，默认使用XMLLanguage驱动
     LanguageDriver languageDriver = getLanguageDriver(method);
+    
     SqlSource sqlSource = getSqlSourceFromAnnotations(method, parameterTypeClass, languageDriver);
     if (sqlSource != null) {
       Options options = method.getAnnotation(Options.class);
@@ -328,6 +331,12 @@ public class MapperAnnotationBuilder {
     }
   }
   
+  
+  /**
+   * 获取方法的语言驱动，默认使用XMLLanguage驱动
+   * @param method
+   * @return
+   */
   private LanguageDriver getLanguageDriver(Method method) {
     Lang lang = method.getAnnotation(Lang.class);
     Class<?> langClass = null;
@@ -337,6 +346,18 @@ public class MapperAnnotationBuilder {
     return assistant.getLanguageDriver(langClass);
   }
 
+  
+  
+  /**
+   * 获取方法的参数类型（忽略rowbounds & resulthandler）
+   * 
+   * 如果没有参数，返回null
+   * 如果只有一个参数，返回参数类型
+   * 如果有多个参数，返回ParamMap
+   * 
+   * @param method
+   * @return
+   */
   private Class<?> getParameterType(Method method) {
     Class<?> parameterType = null;
     Class<?>[] parameterTypes = method.getParameterTypes();
@@ -396,15 +417,23 @@ public class MapperAnnotationBuilder {
 
   private SqlSource getSqlSourceFromAnnotations(Method method, Class<?> parameterType, LanguageDriver languageDriver) {
     try {
+      //获取method上的注解是什么类型的操作(SELECT,UPDATE,INSERT,DELETE)
       Class<? extends Annotation> sqlAnnotationType = getSqlAnnotationType(method);
+      //获取method上的注解是什么类型的操作(SELECTPROVIDER,UPDATEPROVIDER,INSERTPROVIDER,DELETEPROVIDER)
       Class<? extends Annotation> sqlProviderAnnotationType = getSqlProviderAnnotationType(method);
+      //操作(SELECT,UPDATE,INSERT,DELETE)
       if (sqlAnnotationType != null) {
         if (sqlProviderAnnotationType != null) {
           throw new BindingException("You cannot supply both a static SQL and SqlProvider to method named " + method.getName());
         }
+        //获取操作的sql语句
         Annotation sqlAnnotation = method.getAnnotation(sqlAnnotationType);
         final String[] strings = (String[]) sqlAnnotation.getClass().getMethod("value").invoke(sqlAnnotation);
+        //
         return buildSqlSourceFromStrings(strings, parameterType, languageDriver);
+        
+        
+        //操作(SELECTPROVIDER,UPDATEPROVIDER,INSERTPROVIDER,DELETEPROVIDER)
       } else if (sqlProviderAnnotationType != null) {
         Annotation sqlProviderAnnotation = method.getAnnotation(sqlProviderAnnotationType);
         return new ProviderSqlSource(assistant.getConfiguration(), sqlProviderAnnotation);
@@ -416,6 +445,7 @@ public class MapperAnnotationBuilder {
   }
 
   private SqlSource buildSqlSourceFromStrings(String[] strings, Class<?> parameterTypeClass, LanguageDriver languageDriver) {
+	 //合并sql语句
     final StringBuilder sql = new StringBuilder();
     for (String fragment : strings) {
       sql.append(fragment);
@@ -448,14 +478,33 @@ public class MapperAnnotationBuilder {
     return SqlCommandType.valueOf(type.getSimpleName().toUpperCase(Locale.ENGLISH));
   }
 
+  /**
+   * 获取method上的注解是什么类型的操作(SELECT,UPDATE,INSERT,DELETE)
+   * @param method
+   * @return
+   */
   private Class<? extends Annotation> getSqlAnnotationType(Method method) {
     return chooseAnnotationType(method, sqlAnnotationTypes);
   }
 
+  
+  /**
+   * 获取method上的注解是什么类型的操作(SELECTPROVIDER,UPDATEPROVIDER,INSERTPROVIDER,DELETEPROVIDER)
+   * @param method
+   * @return
+   */
   private Class<? extends Annotation> getSqlProviderAnnotationType(Method method) {
     return chooseAnnotationType(method, sqlProviderAnnotationTypes);
   }
 
+  
+  /**
+   * 获取method上的注解是什么类型的操作
+   * 如果没有，返回null
+   * @param method
+   * @param types
+   * @return
+   */
   private Class<? extends Annotation> chooseAnnotationType(Method method, Set<Class<? extends Annotation>> types) {
     for (Class<? extends Annotation> type : types) {
       Annotation annotation = method.getAnnotation(type);

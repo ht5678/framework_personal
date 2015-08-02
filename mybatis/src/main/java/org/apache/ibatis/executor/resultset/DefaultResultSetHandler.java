@@ -323,6 +323,8 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       
       handleRowValuesForNestedResultMap(rsw, resultMap, resultHandler, rowBounds, parentMapping);
     } else {
+      //处理普通的resultset,不包含嵌套的情况
+      //将解析好的rowvalue保存到parentmapping中或者resulthandler里边
       handleRowValuesForSimpleResultMap(rsw, resultMap, resultHandler, rowBounds, parentMapping);
     }
   }  
@@ -351,6 +353,19 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     }
   } 
 
+  
+  /**
+   * 处理普通的resultset,不包含嵌套的情况，
+   *   *使用resultmapping映射（根据规范自动匹配的&代码方式设置）来处理一行数据组装的对象返回
+   *   *将解析好的rowvalue保存到parentmapping中或者resulthandler里边
+   *  
+   * @param rsw
+   * @param resultMap
+   * @param resultHandler
+   * @param rowBounds
+   * @param parentMapping
+   * @throws SQLException
+   */
   private void handleRowValuesForSimpleResultMap(ResultSetWrapper rsw, ResultMap resultMap, ResultHandler resultHandler, RowBounds rowBounds, ResultMapping parentMapping)
       throws SQLException {
     //构造函数,初始化DefaultResultContext(数据库查询结果上下文)
@@ -361,20 +376,36 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     while (shouldProcessMoreRows(resultContext, rowBounds) && rsw.getResultSet().next()) {
       //处理resultmap里边的Discriminator(switch)情况,将resultmap返回
       ResultMap discriminatedResultMap = resolveDiscriminatedResultMap(rsw.getResultSet(), resultMap, null);
-      //处理一行数据组装的对象返回
+      //使用resultmapping映射（根据规范自动匹配的&代码方式设置）来处理一行数据组装的对象返回
       Object rowValue = getRowValue(rsw, discriminatedResultMap);
+      //将解析好的rowvalue保存到parentmapping中或者resulthandler里边
       storeObject(resultHandler, resultContext, rowValue, parentMapping, rsw.getResultSet());
     }
   }
 
   
+  /**
+   * 如果是嵌套类型， 有父类映射
+   * 就将rowvalue赋值给parent（分三种情况）
+   * 如果不是嵌套类型，就将rowvalue保存到resulthandler里边
+   * 
+   * 总结：
+   * 将解析好的rowvalue保存到parentmapping中或者resulthandler里边
+   * 
+   * @param resultHandler
+   * @param resultContext
+   * @param rowValue
+   * @param parentMapping
+   * @param rs
+   * @throws SQLException
+   */
   private void storeObject(ResultHandler resultHandler, DefaultResultContext resultContext, Object rowValue, ResultMapping parentMapping, ResultSet rs) throws SQLException {
 	//如果父类的mapping不为空,就是说存在嵌套情况  
     if (parentMapping != null) {
       //给parent映射字段赋值rowvalue
       linkToParents(rs, parentMapping, rowValue);
     } else {
-       
+       //将rowvalue保存到defaultresulthandler的list上
       callResultHandler(resultHandler, resultContext, rowValue);
     }
   }
@@ -430,7 +461,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
   // GET VALUE FROM ROW FOR SIMPLE RESULT MAP
   //
   /**
-   * 处理一行数据组装的对象返回
+   * 使用resultmapping映射（根据规范自动匹配的&代码方式设置）来处理一行数据组装的对象返回
    * @param rsw
    * @param resultMap
    * @return
@@ -454,7 +485,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     	//基本类型的属性被赋值
         foundValues = applyAutomaticMappings(rsw, resultMap, metaObject, null) || foundValues;
       }
-      //有嵌套查询类型的属性，如果启用懒加载，就初始化一个loadpair放到resultloader里边
+      //有设置的复合查询（一对多，，，，@oneToMany...）属性，如果启用懒加载，就初始化一个loadpair放到resultloader里边
       //如果没有启动懒加载，就将查询出来的value赋值到metaobject的属性里
       foundValues = applyPropertyMappings(rsw, resultMap, metaObject, lazyLoader, null) || foundValues;
       foundValues = lazyLoader.size() > 0 || foundValues;
@@ -1179,6 +1210,9 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       //为每个resultset创建一个唯一的cachekey
       final CacheKey rowKey = createRowKey(discriminatedResultMap, rsw, null);
       //TODO:尝试从nestedResultObjects通过cachekey获取缓存结果,partialObject可能代表嵌套
+      //在这里，可能是嵌套查询 1 <-- 2,1查询中嵌套了2,然后1是嵌套查询，2是普通查询，
+      //在DefaultResulthandler.handleRowValues() handleRowValuesForSimpleResultMap 解析2的时候，判定2有parentmapping，所以讲2的rowvalue赋值到
+      //1，然后还将parentmapping缓存到nestedResultObjects中，然后在这里获取缓存的parentmapping
       Object partialObject = nestedResultObjects.get(rowKey);
       //TODO:如果isResultOrdered是true
       if (mappedStatement.isResultOrdered()) { // issue #577 && #542
@@ -1186,10 +1220,10 @@ public class DefaultResultSetHandler implements ResultSetHandler {
         if (partialObject == null && rowValue != null) {
           //先清除缓存结果
           nestedResultObjects.clear();
-          
+          //重新缓存一次，将解析好的rowvalue保存到parentmapping中或者resulthandler里边
           storeObject(resultHandler, resultContext, rowValue, parentMapping, rsw.getResultSet());
         }
-        //
+        //获取resultset一行数据的value，并且赋值到partialObject返回
         rowValue = getRowValue(rsw, discriminatedResultMap, rowKey, rowKey, null, partialObject);
       } else {
         rowValue = getRowValue(rsw, discriminatedResultMap, rowKey, rowKey, null, partialObject);
@@ -1236,12 +1270,15 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       //缓存resultobject(祖先)到ancestorObjects
       // 缓存resultmapId -- columnPrefix到ancestorColumnPrefix
       putAncestor(absoluteKey, resultObject, resultMapId, columnPrefix);
-      
+      //根据resultmap.getPropertyResultMappings来将resultset中的数据库value赋值到metaObject中
       applyNestedResultMappings(rsw, resultMap, metaObject, columnPrefix, combinedKey, false);
       ancestorObjects.remove(absoluteKey);
     } else {
       final ResultLoaderMap lazyLoader = new ResultLoaderMap();
+      //根据resultmap的resulttype来初始化返回对象，如果对象的属性有嵌套查询并且支持懒加载，
+      //就返回代理对象，否则返回原生结果对象
       resultObject = createResultObject(rsw, resultMap, lazyLoader, columnPrefix);
+      
       if (resultObject != null && !typeHandlerRegistry.hasTypeHandler(resultMap.getType())) {
         final MetaObject metaObject = configuration.newMetaObject(resultObject);
         boolean foundValues = resultMap.getConstructorResultMappings().size() > 0;
@@ -1308,6 +1345,10 @@ public class DefaultResultSetHandler implements ResultSetHandler {
    * 如果resultmapping(字段映射)的java类型是collection的子类,那么就将rowvalue添加到集合里边
    * 如果resultmapping(字段映射)的java类型不是collection的子类,那么就将rowvalue通过metaobject赋值给type类型
    * 
+   * 
+   * 总结：
+   * 根据resultmap.getPropertyResultMappings来将resultset中的数据库value赋值到metaObject中
+   * 
    * @param rsw
    * @param resultMap
    * @param metaObject
@@ -1356,7 +1397,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
             final Object collectionProperty = instantiateCollectionPropertyIfAppropriate(resultMapping, metaObject);            
             //判断resultmapping的notnullcolumns是否存在至少一个能从resultset中取值的column
             if (anyNotNullColumnHasValue(resultMapping, columnPrefix, rsw.getResultSet())) {
-              //TODO:
+              //获取resultset一行数据的value，并且赋值到partialObject返回
               rowValue = getRowValue(rsw, nestedResultMap, combinedKey, rowKey, columnPrefix, rowValue);
             //如果rowvalue不为空  & knownValue为false,将
               if (rowValue != null && !knownValue) {
