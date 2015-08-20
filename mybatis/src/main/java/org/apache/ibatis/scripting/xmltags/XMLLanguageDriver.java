@@ -46,16 +46,24 @@ public class XMLLanguageDriver implements LanguageDriver {
     return builder.parseScriptNode();
   }
 
+  
+  /**
+   * 根据script（sql）中包含的不同#{}.${}，创建不同的sqlsource返回
+   */
   public SqlSource createSqlSource(Configuration configuration, String script, Class<?> parameterType) {
     if (script.startsWith("<script>")) { // issue #3
       XPathParser parser = new XPathParser(script, false, configuration.getVariables(), new XMLMapperEntityResolver());
       return createSqlSource(configuration, parser.evalNode("/script"), parameterType);
     } else {
+    //判断配置文件properties中是否有属性替换${value}
       script = PropertyParser.parse(script, configuration.getVariables()); // issue #127
       TextSqlNode textSqlNode = new TextSqlNode(script);
+      //判断script字符串中是否包含${ }字符串
       if (textSqlNode.isDynamic()) {
+    	  //${xxx}
         return new DynamicSqlSource(configuration, textSqlNode);
       } else {
+    	  //#{yyy}
         return new RawSqlSource(configuration, script, parameterType);
       }
     }

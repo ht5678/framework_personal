@@ -248,20 +248,28 @@ public class MapperAnnotationBuilder {
     Class<?> parameterTypeClass = getParameterType(method);
     //获取方法的语言驱动，默认使用XMLLanguage驱动
     LanguageDriver languageDriver = getLanguageDriver(method);
-    
+    //根据注解sql创建sqlsource
     SqlSource sqlSource = getSqlSourceFromAnnotations(method, parameterTypeClass, languageDriver);
+    
     if (sqlSource != null) {
       Options options = method.getAnnotation(Options.class);
+      //创建mappedstatementid : 类名.方法名  ,所以一个接口中的方法名是不能够重复的，不然悔报错
       final String mappedStatementId = type.getName() + "." + method.getName();
       Integer fetchSize = null;
       Integer timeout = null;
+      //PrepareStatement(Statement的子类)
       StatementType statementType = StatementType.PREPARED;
+      //结果集的游标只能向下滚动  , 只能使用resultSet.getNext()
       ResultSetType resultSetType = ResultSetType.FORWARD_ONLY;
+      //根据注解获取sql类型（SELECT,UPDATE,INSERT,DELETE）
       SqlCommandType sqlCommandType = getSqlCommandType(method);
+      //是否是查询类型
       boolean isSelect = sqlCommandType == SqlCommandType.SELECT;
+      //如果是查询类型的话，默认不刷新缓存，并且将查询结构缓存起来
       boolean flushCache = !isSelect;
       boolean useCache = isSelect;
 
+      
       KeyGenerator keyGenerator;
       String keyProperty = "id";
       String keyColumn = null;
@@ -415,6 +423,16 @@ public class MapperAnnotationBuilder {
     return returnType;
   }
 
+  
+  
+  /**
+   * 通过SELECT,UPDATE,INSERT,DELETE注解和SELECTPROVIDER,UPDATEPROVIDER,INSERTPROVIDER,DELETEPROVIDER注解
+   * 创建sqlsource返回
+   * @param method
+   * @param parameterType
+   * @param languageDriver
+   * @return
+   */
   private SqlSource getSqlSourceFromAnnotations(Method method, Class<?> parameterType, LanguageDriver languageDriver) {
     try {
       //获取method上的注解是什么类型的操作(SELECT,UPDATE,INSERT,DELETE)
@@ -429,7 +447,7 @@ public class MapperAnnotationBuilder {
         //获取操作的sql语句
         Annotation sqlAnnotation = method.getAnnotation(sqlAnnotationType);
         final String[] strings = (String[]) sqlAnnotation.getClass().getMethod("value").invoke(sqlAnnotation);
-        //
+        //根据script（sql）中包含的不同#{}.${}，创建不同的sqlsource返回
         return buildSqlSourceFromStrings(strings, parameterType, languageDriver);
         
         
@@ -444,6 +462,10 @@ public class MapperAnnotationBuilder {
     }
   }
 
+  
+  /**
+   * 根据script（sql）中包含的不同#{}.${}，创建不同的sqlsource返回
+   */
   private SqlSource buildSqlSourceFromStrings(String[] strings, Class<?> parameterTypeClass, LanguageDriver languageDriver) {
 	 //合并sql语句
     final StringBuilder sql = new StringBuilder();
@@ -454,6 +476,13 @@ public class MapperAnnotationBuilder {
     return languageDriver.createSqlSource(configuration, sql.toString(), parameterTypeClass);
   }
 
+  
+  
+  /**
+   * 根据注解获取sql类型（SELECT,UPDATE,INSERT,DELETE）
+   * @param method
+   * @return
+   */
   private SqlCommandType getSqlCommandType(Method method) {
     Class<? extends Annotation> type = getSqlAnnotationType(method);
 

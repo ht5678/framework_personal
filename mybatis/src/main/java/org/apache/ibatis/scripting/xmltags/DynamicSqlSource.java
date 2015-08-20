@@ -23,7 +23,7 @@ import org.apache.ibatis.mapping.SqlSource;
 import org.apache.ibatis.session.Configuration;
 
 /**
- * 
+ * ${}
  * 带有变量的sqlsource
  * 
  * @author Clinton Begin
