@@ -56,6 +56,13 @@ public class MapperRegistry {
     return knownMappers.containsKey(type);
   }
 
+  
+  
+  /**
+   * 将dao接口解析它的所有方法并且添加到configuration中
+   * 在操作代理的dao接口的时候，通过mappermethod来代理操作使用
+   * @param type
+   */
   public <T> void addMapper(Class<T> type) {
     if (type.isInterface()) {
       if (hasMapper(type)) {
@@ -68,6 +75,8 @@ public class MapperRegistry {
         // otherwise the binding may automatically be attempted by the
         // mapper parser. If the type is already known, it won't try.
         MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
+        //解析type的所有方法，生成对应的mappedstatement,还有主键的mappedstatement，keygenerator,添加到configuration中
+        //在操作代理的dao接口的时候，通过mappermethod来代理操作使用
         parser.parse();
         loadCompleted = true;
       } finally {

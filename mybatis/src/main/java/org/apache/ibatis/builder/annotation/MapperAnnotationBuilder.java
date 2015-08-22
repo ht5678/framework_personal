@@ -112,14 +112,24 @@ public class MapperAnnotationBuilder {
     sqlProviderAnnotationTypes.add(DeleteProvider.class);
   }
 
+  
+  /**
+   * 解析type的所有方法，生成对应的mappedstatement,还有主键的mappedstatement，keygenerator,添加到configuration中
+   * 在操作代理的dao接口的时候，通过mappermethod来代理操作使用
+   */
   public void parse() {
     String resource = type.toString();
+    
     if (!configuration.isResourceLoaded(resource)) {
+      //加载配置文件
       loadXmlResource();
+      //将加载的资源记录到configuration的loadedResources中
       configuration.addLoadedResource(resource);
+      //设置mappedstatementid的namespace
       assistant.setCurrentNamespace(type.getName());
       parseCache();
       parseCacheRef();
+      //生成type的所有方法的mappedstatement，除去桥方法（桥方法是因为泛型的类型擦除）
       Method[] methods = type.getMethods();
       for (Method method : methods) {
         try {
@@ -131,9 +141,14 @@ public class MapperAnnotationBuilder {
         }
       }
     }
+    //将所有没有正常完成解析的method方法再次尝试解析
     parsePendingMethods();
   }
 
+  
+  /**
+   * 将所有没有正常完成解析的method方法再次尝试解析
+   */
   private void parsePendingMethods() {
     Collection<MethodResolver> incompleteMethods = configuration.getIncompleteMethods();
     synchronized (incompleteMethods) {
@@ -149,6 +164,9 @@ public class MapperAnnotationBuilder {
     }
   }
 
+  /**
+   * 配置文件方式的使用，
+   */
   private void loadXmlResource() {
     // Spring may not know the real resource name so we check a flag
     // to prevent loading again a resource twice
@@ -243,6 +261,15 @@ public class MapperAnnotationBuilder {
     return null;
   }
 
+  
+ 
+  /**
+   * 主要是两个操作;
+   * 1.将方法method生成对应的mappedstatement,并且添加到configuration的mappedstatements--map中
+   * 2.根据主键生成对应的mappedstatement，keygenerator，分别添加到configuration的mappedstatements--map，keygenerators中
+   * 
+   * @param method
+   */
   void parseStatement(Method method) {
 	 //获取方法的参数类型（忽略rowbounds & resulthandler）
     Class<?> parameterTypeClass = getParameterType(method);
@@ -270,16 +297,26 @@ public class MapperAnnotationBuilder {
       boolean useCache = isSelect;
 
       
+      //2.生成主键的相关数据
       KeyGenerator keyGenerator;
       String keyProperty = "id";
       String keyColumn = null;
+      //如果操作类型是  insert或者update，解析selectkey注解
       if (SqlCommandType.INSERT.equals(sqlCommandType) || SqlCommandType.UPDATE.equals(sqlCommandType)) {
         // first check for SelectKey annotation - that overrides everything else
         SelectKey selectKey = method.getAnnotation(SelectKey.class);
+        //如果使用了selectkey注解，
         if (selectKey != null) {
+          //将@selectKey注解的内容生成对应的mappedstatement并且添加到configuration的mappedstatments中,
+          //使用mappedstatement生成SelectKeyGenerator并且将SelectKeyGenerator添加到configuration的keygenerators中
+          // 返回KeyGenerator
           keyGenerator = handleSelectKeyAnnotation(selectKey, mappedStatementId, getParameterType(method), languageDriver);
           keyProperty = selectKey.keyProperty();
         } else {
+        	
+        	//如果没有使用selectkey注解，
+        	//1.在configuration（配置文件）中配置了自动生成主键，就使用Jdbc3KeyGenerator
+        	//2.在options中使用了usegeneratedkeys，使用Jdbc3KeyGenerator
           if (options == null) {
             keyGenerator = configuration.isUseGeneratedKeys() ? new Jdbc3KeyGenerator() : new NoKeyGenerator();
           } else {
@@ -291,7 +328,8 @@ public class MapperAnnotationBuilder {
       } else {
         keyGenerator = new NoKeyGenerator();
       }
-
+      
+      //解析option注解
       if (options != null) {
         flushCache = options.flushCache();
         useCache = options.useCache();
@@ -301,6 +339,7 @@ public class MapperAnnotationBuilder {
         resultSetType = options.resultSetType();
       }
 
+      //解析resultmap注解
       String resultMapId = null;
       ResultMap resultMapAnnotation = method.getAnnotation(ResultMap.class);
       if (resultMapAnnotation != null) {
@@ -315,6 +354,9 @@ public class MapperAnnotationBuilder {
         resultMapId = parseResultMap(method);
       }
 
+      
+      //1.生成方法的相关数据
+      //生成一个方法对应的mappedstatement,并且添加到configuration的mappedstatements中，mappedstatementid(key):mappedstatement(value)
       assistant.addMappedStatement(
           mappedStatementId,
           sqlSource,
@@ -631,12 +673,28 @@ public class MapperAnnotationBuilder {
     return args == null ? new Arg[0] : args.value();
   }
 
+  
+  /**
+   * 将@selectKey注解的内容生成对应的mappedstatement并且添加到configuration的mappedstatments中,
+   * 使用mappedstatement生成SelectKeyGenerator并且将SelectKeyGenerator添加到configuration的keygenerators中
+   * 返回KeyGenerator
+   * @param selectKeyAnnotation
+   * @param baseStatementId
+   * @param parameterTypeClass
+   * @param languageDriver
+   * @return
+   */
   private KeyGenerator handleSelectKeyAnnotation(SelectKey selectKeyAnnotation, String baseStatementId, Class<?> parameterTypeClass, LanguageDriver languageDriver) {
+	 //id：mappedstatemntId+ !selectkey,作为configuration的mappedstatemnts(map)的key来使用
     String id = baseStatementId + SelectKeyGenerator.SELECT_KEY_SUFFIX;
+    //返回结果类型
     Class<?> resultTypeClass = selectKeyAnnotation.resultType();
+    //statement类型
     StatementType statementType = selectKeyAnnotation.statementType();
+    //key的类属性名和数据库列名
     String keyProperty = selectKeyAnnotation.keyProperty();
     String keyColumn = selectKeyAnnotation.keyColumn();
+    //是否在查询前查询key
     boolean executeBefore = selectKeyAnnotation.before();
 
     // defaults
@@ -652,12 +710,13 @@ public class MapperAnnotationBuilder {
     SqlSource sqlSource = buildSqlSourceFromStrings(selectKeyAnnotation.statement(), parameterTypeClass, languageDriver);
     SqlCommandType sqlCommandType = SqlCommandType.SELECT;
 
+    //通过主键生成对应的mappedstatement，并且添加到configuration的mappedstatemtns中
     assistant.addMappedStatement(id, sqlSource, statementType, sqlCommandType, fetchSize, timeout, parameterMap, parameterTypeClass, resultMap, resultTypeClass, resultSetTypeEnum,
         flushCache, useCache, false,
         keyGenerator, keyProperty, keyColumn, null, languageDriver, null);
-
+    //给mappedstatmentId加上currentnamespace
     id = assistant.applyCurrentNamespace(id, false);
-
+    //通过id获取MappedStatement，并且初始化SelectKeyGenerator，然后将SelectKeyGenerator添加到configuration中的keyGenerators
     MappedStatement keyStatement = configuration.getMappedStatement(id, false);
     SelectKeyGenerator answer = new SelectKeyGenerator(keyStatement, executeBefore);
     configuration.addKeyGenerator(id, answer);

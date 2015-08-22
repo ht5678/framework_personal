@@ -82,6 +82,13 @@ public class MapperBuilderAssistant extends BaseBuilder {
     this.currentNamespace = currentNamespace;
   }
 
+  
+  /**
+   * 给mappedstatmentId加上currentnamespace
+   * @param base
+   * @param isReference
+   * @return
+   */
   public String applyCurrentNamespace(String base, boolean isReference) {
     if (base == null) return null;
     if (isReference) {
@@ -240,6 +247,31 @@ public class MapperBuilderAssistant extends BaseBuilder {
     return discriminatorBuilder.build();
   }
 
+  
+  /**
+   * 生成一个方法对应的mappedstatement,并且添加到configuration的mappedstatements中，mappedstatementid(key):mappedstatement(value)
+   * @param id
+   * @param sqlSource				sql语句相关
+   * @param statementType		通常为PrepareStatement
+   * @param sqlCommandType		数据库操作类型，INSERT,UPDATE,,,
+   * @param fetchSize				
+   * @param timeout
+   * @param parameterMap		参数的value
+   * @param parameterType		参数类型
+   * @param resultMap				返回值map
+   * @param resultType				返回值类型
+   * @param resultSetType		结果类型
+   * @param flushCache				是否刷新缓存
+   * @param useCache				是否使用缓存
+   * @param resultOrdered
+   * @param keyGenerator			主键生成相关
+   * @param keyProperty			主键的属性名称
+   * @param keyColumn				注解的数据库列名
+   * @param databaseId				
+   * @param lang
+   * @param resultSets				结果集
+   * @return
+   */
   public MappedStatement addMappedStatement(
       String id,
       SqlSource sqlSource,
